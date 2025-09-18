@@ -395,7 +395,7 @@ if orcado_files and realizado_files:
         <div style='background: #222; border-radius: 10px; padding: 1.5rem 3rem; box-shadow: 0 2px 8px #0002; text-align:center;'>
             <span style='font-size:1.2em; font-weight:bold;'>Comparativo de Custo Total</span><br>
             <span style='color:#1f77b4; font-weight:bold;'>Orçado: R$ {total_orcado:,.2f}</span> &nbsp;|&nbsp; 
-            <span style='color:#ff0e0e; font-weight:bold;'>Gasto: R$ {total_realizado:,.2f}</span><br>
+            <span style='color:#ff7f0e; font-weight:bold;'>Gasto: R$ {total_realizado:,.2f}</span><br>
             <span style='font-size:1.1em;'>Economia/Prejuízo: <span style='color:{cor}; font-weight:bold;'>R$ {diferenca:,.2f}</span></span>
         </div>
     </div>
@@ -733,4 +733,5 @@ if orcado_files and realizado_files:
         xaxis=dict(type='category', categoryorder='array', categoryarray=codigos_ordenados)
     )
     st.plotly_chart(fig_line, use_container_width=True, key="fig_line")
+
 
