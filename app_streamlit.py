@@ -1,3 +1,4 @@
+# ...existing code...
 
 import streamlit as st
 import pandas as pd
@@ -377,13 +378,14 @@ if orcado_files and realizado_files:
     # Comparativo de custo total orçado vs realizado
 
     total_orcado = df_exibir['Total Orçado'].sum() if 'Total Orçado' in df_exibir.columns else 0
-    # Calcular total gasto: soma do custo unitário realizado * quantidade do orçado para cada código
-    if 'Custo Unitário Realizado' in df_exibir.columns and 'Quantidade' in df_orcado_group.columns:
-        qtd_map = df_orcado_group.groupby(col_codigo_orcado)['Quantidade'].sum()
-        df_exibir['Qtd_Orcado'] = df_exibir[col_codigo_orcado].map(qtd_map).fillna(0)
-        total_realizado = (df_exibir['Custo Unitário Realizado'] * df_exibir['Qtd_Orcado']).sum()
-    else:
-        total_realizado = 0
+    # Calcular total gasto: soma do valor unitário do realizado (Unit) * quantidade realizada (Quantidade) para cada código
+    total_realizado = 0
+    if 'Código_4d' in df_exibir.columns:
+        codigos_familia = set(df_exibir[col_codigo_orcado].astype(str))
+        # Buscar no df_realizado_group os códigos da família
+        df_realizado_fam = df_realizado_group[df_realizado_group[col_codigo_realizado].astype(str).isin(codigos_familia)]
+        if 'Unit' in df_realizado_fam.columns and 'Quantidade' in df_realizado_fam.columns:
+            total_realizado = (pd.to_numeric(df_realizado_fam['Unit'], errors='coerce').fillna(0) * pd.to_numeric(df_realizado_fam['Quantidade'], errors='coerce').fillna(0)).sum()
     diferenca = total_orcado - total_realizado
     cor = 'green' if diferenca > 0 else 'red' if diferenca < 0 else 'gray'
 
@@ -448,23 +450,198 @@ if orcado_files and realizado_files:
 
 
 
-    # Comparativo de Quantidade por Família: mostrar apenas quando uma família específica for selecionada
+
+    # Cards de custo por etapa para a família selecionada (exceto 'Todas')
     if familia_selecionada != 'Todas':
-        qtd_orcada_fam = df_exibir['Qtd_Orcado'].sum() if 'Qtd_Orcado' in df_exibir.columns else 0
-        codigos_fam = df_exibir[col_codigo_orcado].unique().tolist()
-        qtd_realizada_fam = df_realizado_group[df_realizado_group[col_codigo_realizado].isin(codigos_fam)]['Quantidade'].sum() if 'Quantidade' in df_realizado_group.columns else 0
-        dif_qtd_fam = qtd_orcada_fam - qtd_realizada_fam
-        cor_qtd_fam = 'green' if dif_qtd_fam > 0 else 'red' if dif_qtd_fam < 0 else 'gray'
-        st.markdown(f"""
-        <div style='display: flex; justify-content: center; margin: 0.5rem 0;'>
-            <div style='background: #333; border-radius: 8px; padding: 1rem 2rem; box-shadow: 0 1px 4px #0002; text-align:center;'>
-                <span style='font-size:1em; font-weight:bold;'>Comparativo de Quantidade</span><br>
-                <span style='color:#1f77b4; font-weight:bold;'>Orçada: {qtd_orcada_fam:,.0f}</span> &nbsp;|&nbsp; 
-                <span style='color:#ff7f0e; font-weight:bold;'>Realizada: {qtd_realizada_fam:,.0f}</span><br>
-                <span style='font-size:1em;'>Diferença: <span style='color:{cor_qtd_fam}; font-weight:bold;'>{dif_qtd_fam:,.0f}</span></span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Só mostrar Verniz para família Melissa
+        mostrar_verniz = 'melissa' in familia_selecionada.lower()
+        etapas_cards = [
+            ('Hot', 'Hot'),
+            ('Laminação', 'Laminação'),
+            ('Impressão', 'Impressão'),
+            ('Papel', 'Papel'),
+        ]
+        if mostrar_verniz:
+            etapas_cards.insert(3, ('Verniz', 'Verniz'))  # inserir Verniz antes de Papel
+        # Adicionar Clichê ao final
+        etapas_cards.append(('Clichê', 'Clichê'))
+        colunas_orcado_cards = {
+            'Hot': 'Hot',
+            'Laminação': 'Laminação',
+            'Impressão': 'Impressão',
+            'Verniz': 'Verniz',
+            'Papel': 'Papel',
+            'Clichê': 'Clichê',
+        }
+        colunas_realizado_cards = {
+            'Hot': 'Hot',
+            'Laminação': 'Laminação',
+            'Impressão': 'Impressão',
+            'Verniz': 'Verniz',
+            'Papel': 'Papel',
+            'Clichê': 'Clichê',
+        }
+        codigos_familia = set(df_exibir[col_codigo_orcado].astype(str))
+        # Grid de 3 colunas por linha
+        n_cards = len(etapas_cards)
+        n_cols = 3
+        rows = (n_cards + n_cols - 1) // n_cols
+        card_idx = 0
+        for row in range(rows):
+            cols = st.columns(n_cols)
+            for col_num in range(n_cols):
+                if card_idx >= n_cards:
+                    break
+                etapa_key, etapa_nome = etapas_cards[card_idx]
+                col_orcado = colunas_orcado_cards.get(etapa_key)
+                col_realizado = colunas_realizado_cards.get(etapa_key)
+                # Orçado: soma apenas dos códigos da família
+                if col_orcado and col_orcado in df_orcado_group.columns:
+                    valor_orcado = pd.to_numeric(df_orcado_group[df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_familia)][col_orcado], errors='coerce').sum()
+                else:
+                    valor_orcado = 0
+                # Realizado: lógica especial para Clichê
+                if etapa_key == 'Clichê':
+                    valor_realizado = valor_orcado
+                    # Família Jardim: duplicar valor dos códigos específicos
+                    if 'jardim' in familia_selecionada.lower():
+                        codigos_duplicar = {'7899866829077','7899866829091','7899866829107','7899866829114','7899866829121','7899866829176'}
+                        df_cliche = df_orcado_group[(df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_duplicar)) & (df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_familia))]
+                        valor_duplicar = pd.to_numeric(df_cliche['Clichê'], errors='coerce').sum()
+                        valor_realizado += valor_duplicar  # duplicar só esses
+                    # Família Melissa: duplicar valor do código específico
+                    if 'melissa' in familia_selecionada.lower():
+                        codigo_duplicar = '7899866829404'
+                        df_cliche = df_orcado_group[(df_orcado_group[col_codigo_orcado].astype(str) == codigo_duplicar) & (df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_familia))]
+                        valor_duplicar = pd.to_numeric(df_cliche['Clichê'], errors='coerce').sum()
+                        valor_realizado += valor_duplicar
+                elif col_realizado and col_realizado in df_realizado_group.columns and 'Quantidade' in df_realizado_group.columns:
+                    mask_codigos = df_realizado_group[col_codigo_realizado].astype(str).isin(codigos_familia)
+                    valor_realizado = (pd.to_numeric(df_realizado_group.loc[mask_codigos, col_realizado], errors='coerce').fillna(0) * pd.to_numeric(df_realizado_group.loc[mask_codigos, 'Quantidade'], errors='coerce').fillna(0)).sum()
+                else:
+                    valor_realizado = 0
+                cor_card = 'green' if (valor_orcado - valor_realizado) > 0 else 'red' if (valor_orcado - valor_realizado) < 0 else 'gray'
+                with cols[col_num]:
+                    st.markdown(f"""
+                    <div style='background: #222; border-radius: 10px; padding: 1.2rem 2.2rem; box-shadow: 0 2px 8px #0002; text-align:center; min-width: 220px; margin-bottom: 0.5rem;'>
+                        <span style='font-size:1.1em; font-weight:bold;'>Custo de {etapa_nome}</span><br>
+                        <span style='color:#1f77b4; font-weight:bold;'>Orçado: R$ {valor_orcado:,.2f}</span> &nbsp;|&nbsp; 
+                        <span style='color:#ff7f0e; font-weight:bold;'>Gasto: R$ {valor_realizado:,.2f}</span><br>
+                        <span style='font-size:1.05em;'>Economia/Prejuízo: <span style='color:{cor_card}; font-weight:bold;'>R$ {valor_orcado - valor_realizado:,.2f}</span></span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    # Detalhamento por código
+                    with st.expander(f"Ver detalhamento de {etapa_nome}"):
+                        # Orçado por código (com categoria)
+                        categoria_col = None
+                        for cat_col in ['CATEGORIA', 'TIPO']:
+                            if cat_col in df_orcado_group.columns:
+                                categoria_col = cat_col
+                                break
+                        cols_orcado = [col_codigo_orcado, col_orcado] + ([categoria_col] if categoria_col else [])
+                        cols_orcado = [c for c in cols_orcado if c is not None]
+                        if col_orcado and col_orcado in df_orcado_group.columns:
+                            df_orcado_cod = df_orcado_group[df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_familia)][cols_orcado].copy()
+                            df_orcado_cod = df_orcado_cod.rename(columns={col_orcado: 'Orçado'})
+                        else:
+                            df_orcado_cod = pd.DataFrame(columns=[col_codigo_orcado, 'Orçado'] + ([categoria_col] if categoria_col else []))
+                        # Realizado por código
+                        if etapa_key == 'Clichê':
+                            # Clichê: realizado igual ao orçado, exceto regras especiais
+                            df_realizado_cod = df_orcado_cod.copy()
+                            df_realizado_cod['Realizado'] = df_realizado_cod['Orçado']
+                            if 'jardim' in familia_selecionada.lower():
+                                codigos_duplicar = {'7899866829077','7899866829091','7899866829107','7899866829114','7899866829121','7899866829176'}
+                                mask_dup = df_realizado_cod[col_codigo_orcado].astype(str).isin(codigos_duplicar)
+                                df_realizado_cod.loc[mask_dup, 'Realizado'] = df_realizado_cod.loc[mask_dup, 'Orçado'] * 2
+                            if 'melissa' in familia_selecionada.lower():
+                                codigo_duplicar = '7899866829404'
+                                mask_dup = df_realizado_cod[col_codigo_orcado].astype(str) == codigo_duplicar
+                                df_realizado_cod.loc[mask_dup, 'Realizado'] = df_realizado_cod.loc[mask_dup, 'Orçado'] * 2
+                        elif col_realizado and col_realizado in df_realizado_group.columns and 'Quantidade' in df_realizado_group.columns:
+                            mask_codigos = df_realizado_group[col_codigo_realizado].astype(str).isin(codigos_familia)
+                            df_realizado_cod = df_realizado_group.loc[mask_codigos, [col_codigo_realizado, col_realizado, 'Quantidade']].copy()
+                            df_realizado_cod['Realizado'] = pd.to_numeric(df_realizado_cod[col_realizado], errors='coerce').fillna(0) * pd.to_numeric(df_realizado_cod['Quantidade'], errors='coerce').fillna(0)
+                            df_realizado_cod = df_realizado_cod.rename(columns={col_codigo_realizado: col_codigo_orcado})
+                            df_realizado_cod = df_realizado_cod[[col_codigo_orcado, 'Realizado']]
+                        else:
+                            df_realizado_cod = pd.DataFrame(columns=[col_codigo_orcado, 'Realizado'])
+                        # Merge orçado e realizado
+                        df_det = pd.merge(df_orcado_cod, df_realizado_cod, on=col_codigo_orcado, how='outer').fillna(0)
+                        # Garante que as colunas existem
+                        if 'Orçado' not in df_det.columns:
+                            df_det['Orçado'] = 0
+                        if 'Realizado' not in df_det.columns:
+                            df_det['Realizado'] = 0
+                        # Converter para float antes de subtrair
+                        df_det['Orçado'] = pd.to_numeric(df_det['Orçado'], errors='coerce').fillna(0)
+                        df_det['Realizado'] = pd.to_numeric(df_det['Realizado'], errors='coerce').fillna(0)
+                        df_det['Economia/Prejuízo'] = df_det['Orçado'] - df_det['Realizado']
+                        df_det = df_det.rename(columns={col_codigo_orcado: 'Código'})
+                        # Remover coluna de categoria da tabela, mas exibir como tooltip ao passar o mouse sobre o código
+                        df_det = df_det[['Código', 'Orçado', 'Realizado', 'Economia/Prejuízo']]
+                        # Criar dicionário de código -> categoria
+                        tooltip_dict = {}
+                        if categoria_col and categoria_col in df_orcado_cod.columns:
+                            for _, row in df_orcado_cod.iterrows():
+                                tooltip_dict[str(row[col_codigo_orcado])] = str(row[categoria_col])
+                        def highlight_economia(val):
+                            color = 'green' if val > 0 else 'red' if val < 0 else 'gray'
+                            return f'color: {color}; font-weight: bold;'
+                        styled = df_det.style.format({'Orçado': 'R$ {:,.2f}', 'Realizado': 'R$ {:,.2f}', 'Economia/Prejuízo': 'R$ {:,.2f}'}).applymap(highlight_economia, subset=['Economia/Prejuízo'])
+                        # Adiciona tooltip na coluna Código
+                        st.dataframe(styled, use_container_width=True)
+                card_idx += 1
+
+    # Gráfico de economia/prejuízo por categoria dentro da família selecionada
+    if familia_selecionada != 'Todas':
+        categoria_col = None
+        for cat_col in ['CATEGORIA', 'TIPO']:
+            if cat_col in df_orcado_group.columns:
+                categoria_col = cat_col
+                break
+        if categoria_col:
+            codigos_familia = set(df_exibir[col_codigo_orcado].astype(str))
+            df_cat = df_orcado_group[df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_familia)][[col_codigo_orcado, categoria_col]].drop_duplicates()
+            etapas_soma = ['Hot', 'Laminação', 'Impressão', 'Papel']
+            if 'melissa' in familia_selecionada.lower() and 'Verniz' in df_orcado_group.columns:
+                etapas_soma.append('Verniz')
+            if 'Clichê' in df_orcado_group.columns:
+                etapas_soma.append('Clichê')
+            df_orcado_sum = df_orcado_group[df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_familia)].copy()
+            df_orcado_sum['Orçado'] = df_orcado_sum[etapas_soma].apply(pd.to_numeric, errors='coerce').fillna(0).sum(axis=1)
+            df_realizado_sum = df_realizado_group[df_realizado_group[col_codigo_realizado].astype(str).isin(codigos_familia)].copy()
+            df_realizado_sum['Realizado'] = pd.to_numeric(df_realizado_sum['Unit'], errors='coerce').fillna(0) * pd.to_numeric(df_realizado_sum['Quantidade'], errors='coerce').fillna(0)
+            df_cat_det = pd.merge(df_cat, df_orcado_sum[[col_codigo_orcado, 'Orçado']], on=col_codigo_orcado, how='left')
+            df_cat_det = pd.merge(df_cat_det, df_realizado_sum[[col_codigo_realizado, 'Realizado']], left_on=col_codigo_orcado, right_on=col_codigo_realizado, how='left')
+            df_cat_det['Orçado'] = pd.to_numeric(df_cat_det['Orçado'], errors='coerce').fillna(0)
+            df_cat_det['Realizado'] = pd.to_numeric(df_cat_det['Realizado'], errors='coerce').fillna(0)
+            df_cat_det['Economia/Prejuízo'] = df_cat_det['Orçado'] - df_cat_det['Realizado']
+            df_cat_group = df_cat_det.groupby(categoria_col)[['Orçado', 'Realizado', 'Economia/Prejuízo']].sum().reset_index()
+            import plotly.graph_objects as go
+            # Define cor: verde para economia, vermelho para prejuízo
+            df_cat_group['Cor'] = df_cat_group['Economia/Prejuízo'].apply(lambda x: '#2ecc40' if x > 0 else '#ff4136' if x < 0 else '#aaaaaa')
+            fig_cat = go.Figure(go.Bar(
+                y=df_cat_group[categoria_col],
+                x=df_cat_group['Economia/Prejuízo'],
+                orientation='h',
+                marker_color=df_cat_group['Cor'],
+                text=[f"R$ {v:,.2f}" for v in df_cat_group['Economia/Prejuízo']],
+                textposition='outside',
+                hovertemplate=f"Categoria: %{{y}}<br>Economia/Prejuízo: R$ %{{x:,.2f}}<extra></extra>"
+            ))
+            fig_cat.update_layout(
+                title='Economia/Prejuízo por Categoria',
+                xaxis_title='Economia/Prejuízo (R$)',
+                yaxis_title='Categoria',
+                # Remover fundo branco para respeitar tema escuro
+                # plot_bgcolor='#fff',
+                # paper_bgcolor='#fff',
+                height=380,
+                margin=dict(l=60, r=30, t=60, b=40),
+                showlegend=False
+            )
+            st.plotly_chart(fig_cat, use_container_width=True)
 
     st.markdown("---")
     st.markdown(f"#### Estatísticas Descritivas — {titulo_familia}")
@@ -481,29 +658,62 @@ if orcado_files and realizado_files:
     })
     st.dataframe(desc[['Qtd. Códigos', 'Média', 'Desvio Padrão', 'Mínimo', '1º Quartil', 'Mediana', '3º Quartil', 'Máximo']])
 
-    # Gráfico de pizza: proporção do total orçado por código
-    st.markdown(f"#### Proporção do Orçado por Código — {titulo_familia}")
-    fig_pie = px.pie(
-        df_exibir,
-        names=col_codigo_orcado,
-        values='Total Orçado',
-        title=f'Proporção do Orçado por Código — {titulo_familia}',
-        color_discrete_sequence=px.colors.sequential.Blues
-    )
-    fig_pie.update_traces(textinfo='percent+label', pull=[0.05]*len(df_exibir))
-    st.plotly_chart(fig_pie, use_container_width=True)
+    # Gráficos de pizza: proporção do orçado e do realizado por código
+    if familia_selecionada != 'Todas':
+        st.markdown(f"#### Proporção do Orçado e Realizado por Código — {titulo_familia}")
+        df_pie = df_exibir.copy()
+        df_pie = df_pie.sort_values('Total Orçado', ascending=True)
+        from plotly.colors import sample_colorscale
+        n = len(df_pie)
+        blues = sample_colorscale('Blues', [i/(n-1) if n>1 else 0.5 for i in range(n)])
+        fig_pie_orcado = px.pie(
+            df_pie,
+            names=col_codigo_orcado,
+            values='Total Orçado',
+            title=f'Orçado por Código',
+            color_discrete_sequence=blues
+        )
+        fig_pie_orcado.update_traces(textinfo='percent+label', textposition='inside', pull=[0.05]*len(df_pie))
+        fig_pie_orcado.update_layout(height=400, width=800, margin=dict(l=20, r=20, t=60, b=20))
+        # Gráfico do Realizado
+        show_realizado = 'Total Realizado' in df_pie.columns and df_pie['Total Realizado'].sum() > 0
+        if show_realizado:
+            df_pie = df_pie.sort_values('Total Realizado', ascending=True)
+            oranges = sample_colorscale('Oranges', [i/(n-1) if n>1 else 0.5 for i in range(n)])
+            fig_pie_real = px.pie(
+                df_pie,
+                names=col_codigo_orcado,
+                values='Total Realizado',
+                title=f'Realizado por Código',
+                color_discrete_sequence=oranges
+            )
+            fig_pie_real.update_traces(textinfo='percent+label', textposition='inside', pull=[0.05]*len(df_pie))
+            fig_pie_real.update_layout(height=400, width=800, margin=dict(l=20, r=20, t=60, b=20))
+        # Exibição: lado a lado para família específica, um embaixo do outro para 'Todas'
+        if familia_selecionada == 'Todas':
+            pass  # Não exibe gráficos de pizza para 'Todas'
+        else:
+            if show_realizado:
+                cols_pie = st.columns(2)
+                with cols_pie[0]:
+                    st.plotly_chart(fig_pie_orcado, use_container_width=True)
+                with cols_pie[1]:
+                    st.plotly_chart(fig_pie_real, use_container_width=True)
+            else:
+                st.plotly_chart(fig_pie_orcado, use_container_width=True)
 
 
-    st.markdown(f"#### Dispersão Orçado x Realizado — {titulo_familia}")
-    fig_scatter = px.scatter(
-        df_exibir,
-        x='Custo Unitário Orçado',
-        y='Custo Unitário Realizado',
-        hover_data=[col_codigo_orcado],
-        title=f'Dispersão Orçado x Realizado — {titulo_familia}',
-        labels={'Custo Unitário Orçado': 'Orçado (R$)', 'Custo Unitário Realizado': 'Realizado (R$)'}
-    )
-    fig_scatter.update_traces(marker=dict(size=10, color='#1f77b4', line=dict(width=1, color='DarkSlateGrey')))
+    if familia_selecionada != 'Todas':
+        st.markdown(f"#### Dispersão Orçado x Realizado — {titulo_familia}")
+        fig_scatter = px.scatter(
+            df_exibir,
+            x='Custo Unitário Orçado',
+            y='Custo Unitário Realizado',
+            hover_data=[col_codigo_orcado],
+            title=f'Dispersão Orçado x Realizado — {titulo_familia}',
+            labels={'Custo Unitário Orçado': 'Orçado (R$)', 'Custo Unitário Realizado': 'Realizado (R$)'}
+        )
+        fig_scatter.update_traces(marker=dict(size=10, color='#1f77b4', line=dict(width=1, color='DarkSlateGrey')))
 
 
     # Gráfico de linha de tendência dos custos unitários por código (usando mesma base filtrada do gráfico de colunas)
