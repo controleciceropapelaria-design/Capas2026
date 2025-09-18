@@ -9,15 +9,20 @@ st.title("Análise de Custos: Orçado vs Realizado")
 
 
 
-# Caminhos fixos para os arquivos
-ORCADO_DIR = "orcados"
-REALIZADO_DIR = "realizado"
 
-orcado_dir_path = os.path.join(os.getcwd(), ORCADO_DIR)
-realizado_dir_path = os.path.join(os.getcwd(), REALIZADO_DIR)
-
-orcado_files = [os.path.join(orcado_dir_path, f) for f in os.listdir(orcado_dir_path) if f.endswith('.csv')]
-realizado_files = [os.path.join(realizado_dir_path, f) for f in os.listdir(realizado_dir_path) if f.endswith('.csv')]
+# URLs dos arquivos CSV no GitHub
+orcado_urls = [
+    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capasbossanova.csv",
+    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capasdoceflorada.csv",
+    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capasfabula.csv",
+    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capasjardim.csv",
+    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capaskraft.csv",
+    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capaslibelulas.csv",
+    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capasmelissa.csv",
+    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capasorigens.csv",
+    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capaspraia.csv"
+]
+realizado_url = "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/realizado/custorelaizadoreal.csv"
 
 def load_data(file):
     try:
@@ -33,30 +38,28 @@ def load_data(file):
         st.error(f"Erro ao ler o arquivo {file}: {e}")
         return None
 
-df_orcado = None
-df_realizado = None
 
-if orcado_files and realizado_files:
-    # Concatenar todos os orçados, adicionando coluna 'Familia' com o nome do arquivo
-    dfs_orcado = []
-    for f in orcado_files:
-        df = load_data(f)
-        if df is not None:
-            if 'Código' not in df.columns:
-                st.error(f"O arquivo '{os.path.basename(f)}' não possui a coluna 'Código'. Corrija o arquivo e tente novamente.")
-                continue
-            familia_nome = os.path.splitext(os.path.basename(f))[0]
-            df['Familia'] = familia_nome
-            # Adiciona coluna com os últimos 4 dígitos do código
-            df['Código_4d'] = df['Código'].astype(str).str[-4:]
-            dfs_orcado.append(df)
-    if not dfs_orcado:
-        st.error("Nenhum arquivo de orçado válido carregado.")
-    else:
-        df_orcado = pd.concat(dfs_orcado, ignore_index=True)
+# Carregar arquivos orçados das URLs
+orcado_dfs = []
+for url in orcado_urls:
+    df = load_data(url)
+    if df is not None:
+        # Extrair nome da família do final da URL
+        familia_nome = url.split('/')[-1].replace('.csv', '')
+        df['Familia'] = familia_nome
+        orcado_dfs.append(df)
+if orcado_dfs:
+    df_orcado = pd.concat(orcado_dfs, ignore_index=True)
+else:
+    st.error("Nenhum arquivo de orçado válido carregado das URLs.")
 
-    # Usar o primeiro arquivo de realizado encontrado
-    df_realizado = load_data(realizado_files[0])
+# Carregar realizado da URL
+df_realizado = load_data(realizado_url)
+if df_realizado is not None:
+    if 'Código' not in df_realizado.columns:
+        st.error("O arquivo de realizado não possui a coluna 'Código'. Corrija o arquivo e tente novamente.")
+else:
+    st.error("Arquivo de realizado não encontrado ou inválido na URL.")
     if df_realizado is not None:
         if 'Código' not in df_realizado.columns:
             st.error("O arquivo de realizado não possui a coluna 'Código'. Corrija o arquivo e tente novamente.")
