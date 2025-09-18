@@ -73,31 +73,31 @@ if df_orcado is not None and not df_orcado.empty and df_realizado is not None an
     col_qtd_orcado = 'Quantidade'
     col_unit_orcado = 'Unit'
     col_codigo_realizado = 'Código_4d'
-    # ...existing code...
-        col_valor_realizado = None
-        col_qtd_realizado = None
-        # Procurar coluna de quantidade (segunda coluna numérica)
-        for c in df_realizado.columns:
-            if 'qtd' in c.lower() or 'quant' in c.lower():
-                col_qtd_realizado = c
-                break
-        if col_qtd_realizado is None and len(df_realizado.columns) > 1:
-            # Tenta pegar a segunda coluna
-            col_qtd_realizado = df_realizado.columns[1]
-        # Procurar coluna de total (última coluna numérica)
-        for c in reversed(df_realizado.columns):
-            if 'total' in c.lower():
-                col_valor_realizado = c
-                break
-        if col_valor_realizado is None:
-            # Tenta pegar a última coluna
-            col_valor_realizado = df_realizado.columns[-1]
 
-        # Renomear para padronizar
-        df_realizado_group = df_realizado.copy()
-        if col_valor_realizado != 'Total':
-            df_realizado_group['Total'] = df_realizado_group[col_valor_realizado]
-            col_valor_realizado = 'Total'
+    col_valor_realizado = None
+    col_qtd_realizado = None
+    # Procurar coluna de quantidade (segunda coluna numérica)
+    for c in df_realizado.columns:
+        if 'qtd' in c.lower() or 'quant' in c.lower():
+            col_qtd_realizado = c
+            break
+    if col_qtd_realizado is None and len(df_realizado.columns) > 1:
+        # Tenta pegar a segunda coluna
+        col_qtd_realizado = df_realizado.columns[1]
+    # Procurar coluna de total (última coluna numérica)
+    for c in reversed(df_realizado.columns):
+        if 'total' in c.lower():
+            col_valor_realizado = c
+            break
+    if col_valor_realizado is None:
+        # Tenta pegar a última coluna
+        col_valor_realizado = df_realizado.columns[-1]
+
+    # Renomear para padronizar
+    df_realizado_group = df_realizado.copy()
+    if col_valor_realizado != 'Total':
+        df_realizado_group['Total'] = df_realizado_group[col_valor_realizado]
+        col_valor_realizado = 'Total'
         if col_qtd_realizado != 'Quantidade':
             df_realizado_group['Quantidade'] = df_realizado_group[col_qtd_realizado]
             col_qtd_realizado = 'Quantidade'
