@@ -9,20 +9,15 @@ st.title("Análise de Custos: Orçado vs Realizado")
 
 
 
+# Caminhos fixos para os arquivos
+ORCADO_DIR = "orcados"
+REALIZADO_DIR = "realizado"
 
-# URLs dos arquivos CSV no GitHub
-orcado_urls = [
-    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capasbossanova.csv",
-    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capasdoceflorada.csv",
-    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capasfabula.csv",
-    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capasjardim.csv",
-    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capaskraft.csv",
-    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capaslibelulas.csv",
-    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capasmelissa.csv",
-    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capasorigens.csv",
-    "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/orcados/capaspraia.csv"
-]
-realizado_url = "https://raw.githubusercontent.com/controleciceropapelaria-design/Capas2026/refs/heads/main/realizado/custorelaizadoreal.csv"
+orcado_dir_path = os.path.join(os.getcwd(), ORCADO_DIR)
+realizado_dir_path = os.path.join(os.getcwd(), REALIZADO_DIR)
+
+orcado_files = [os.path.join(orcado_dir_path, f) for f in os.listdir(orcado_dir_path) if f.endswith('.csv')]
+realizado_files = [os.path.join(realizado_dir_path, f) for f in os.listdir(realizado_dir_path) if f.endswith('.csv')]
 
 def load_data(file):
     try:
@@ -38,66 +33,72 @@ def load_data(file):
         st.error(f"Erro ao ler o arquivo {file}: {e}")
         return None
 
+df_orcado = None
+df_realizado = None
 
-orcado_dfs = []
-for url in orcado_urls:
-    df = load_data(url)
-    if df is not None:
-        familia_nome = url.split('/')[-1].replace('.csv', '')
-        df['Familia'] = familia_nome
-        orcado_dfs.append(df)
-if orcado_dfs:
-    df_orcado = pd.concat(orcado_dfs, ignore_index=True)
-else:
-    df_orcado = None
-    st.error("Nenhum arquivo de orçado válido carregado das URLs.")
+if orcado_files and realizado_files:
+    # Concatenar todos os orçados, adicionando coluna 'Familia' com o nome do arquivo
+    dfs_orcado = []
+    for f in orcado_files:
+        df = load_data(f)
+        if df is not None:
+            if 'Código' not in df.columns:
+                st.error(f"O arquivo '{os.path.basename(f)}' não possui a coluna 'Código'. Corrija o arquivo e tente novamente.")
+                continue
+            familia_nome = os.path.splitext(os.path.basename(f))[0]
+            df['Familia'] = familia_nome
+            # Adiciona coluna com os últimos 4 dígitos do código
+            df['Código_4d'] = df['Código'].astype(str).str[-4:]
+            dfs_orcado.append(df)
+    if not dfs_orcado:
+        st.error("Nenhum arquivo de orçado válido carregado.")
+    else:
+        df_orcado = pd.concat(dfs_orcado, ignore_index=True)
 
-df_realizado = load_data(realizado_url)
-if df_realizado is not None:
-    if 'Código' not in df_realizado.columns:
-        st.error("O arquivo de realizado não possui a coluna 'Código'. Corrija o arquivo e tente novamente.")
-        df_realizado = None
-else:
-    st.error("Arquivo de realizado não encontrado ou inválido na URL.")
+    # Usar o primeiro arquivo de realizado encontrado
+    df_realizado = load_data(realizado_files[0])
+    if df_realizado is not None:
+        if 'Código' not in df_realizado.columns:
+            st.error("O arquivo de realizado não possui a coluna 'Código'. Corrija o arquivo e tente novamente.")
+        else:
+            df_realizado['Código_4d'] = df_realizado['Código'].astype(str).str[-4:]
 
-# Debug: mostrar shapes dos dataframes
-st.write('Shape df_orcado:', df_orcado.shape if df_orcado is not None else None)
-st.write('Shape df_realizado:', df_realizado.shape if df_realizado is not None else None)
 
-# Só executa o app se ambos os dataframes existem e têm dados
-if df_orcado is not None and not df_orcado.empty and df_realizado is not None and not df_realizado.empty:
-    # Padronização automática dos parâmetros de análise
-    col_familia = 'Familia'  # já criada
-    col_codigo_orcado = 'Código_4d'
-    col_valor_orcado = 'Total'
-    col_qtd_orcado = 'Quantidade'
-    col_unit_orcado = 'Unit'
-    col_codigo_realizado = 'Código_4d'
+    if df_orcado is not None and df_realizado is not None:
+        # Padronização automática dos parâmetros de análise
+        col_familia = 'Familia'  # já criada
+        col_codigo_orcado = 'Código_4d'
+        col_valor_orcado = 'Total'
+        col_qtd_orcado = 'Quantidade'
+        col_unit_orcado = 'Unit'
+        col_codigo_realizado = 'Código_4d'
 
-    col_valor_realizado = None
-    col_qtd_realizado = None
-    # Procurar coluna de quantidade (segunda coluna numérica)
-    for c in df_realizado.columns:
-        if 'qtd' in c.lower() or 'quant' in c.lower():
-            col_qtd_realizado = c
-            break
-    if col_qtd_realizado is None and len(df_realizado.columns) > 1:
-        # Tenta pegar a segunda coluna
-        col_qtd_realizado = df_realizado.columns[1]
-    # Procurar coluna de total (última coluna numérica)
-    for c in reversed(df_realizado.columns):
-        if 'total' in c.lower():
-            col_valor_realizado = c
-            break
-    if col_valor_realizado is None:
-        # Tenta pegar a última coluna
-        col_valor_realizado = df_realizado.columns[-1]
+        # Detectar automaticamente a coluna de quantidade e total no realizado
+        # Se não encontrar pelo nome, tenta pelo índice ou tipo
+        col_valor_realizado = None
+        col_qtd_realizado = None
+        # Procurar coluna de quantidade (segunda coluna numérica)
+        for c in df_realizado.columns:
+            if 'qtd' in c.lower() or 'quant' in c.lower():
+                col_qtd_realizado = c
+                break
+        if col_qtd_realizado is None and len(df_realizado.columns) > 1:
+            # Tenta pegar a segunda coluna
+            col_qtd_realizado = df_realizado.columns[1]
+        # Procurar coluna de total (última coluna numérica)
+        for c in reversed(df_realizado.columns):
+            if 'total' in c.lower():
+                col_valor_realizado = c
+                break
+        if col_valor_realizado is None:
+            # Tenta pegar a última coluna
+            col_valor_realizado = df_realizado.columns[-1]
 
-    # Renomear para padronizar
-    df_realizado_group = df_realizado.copy()
-    if col_valor_realizado != 'Total':
-        df_realizado_group['Total'] = df_realizado_group[col_valor_realizado]
-        col_valor_realizado = 'Total'
+        # Renomear para padronizar
+        df_realizado_group = df_realizado.copy()
+        if col_valor_realizado != 'Total':
+            df_realizado_group['Total'] = df_realizado_group[col_valor_realizado]
+            col_valor_realizado = 'Total'
         if col_qtd_realizado != 'Quantidade':
             df_realizado_group['Quantidade'] = df_realizado_group[col_qtd_realizado]
             col_qtd_realizado = 'Quantidade'
