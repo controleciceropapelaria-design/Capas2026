@@ -39,45 +39,41 @@ def load_data(file):
         return None
 
 
-# Carregar arquivos orçados das URLs
 orcado_dfs = []
 for url in orcado_urls:
     df = load_data(url)
     if df is not None:
-        # Extrair nome da família do final da URL
         familia_nome = url.split('/')[-1].replace('.csv', '')
         df['Familia'] = familia_nome
         orcado_dfs.append(df)
 if orcado_dfs:
     df_orcado = pd.concat(orcado_dfs, ignore_index=True)
 else:
+    df_orcado = None
     st.error("Nenhum arquivo de orçado válido carregado das URLs.")
 
-# Carregar realizado da URL
 df_realizado = load_data(realizado_url)
 if df_realizado is not None:
     if 'Código' not in df_realizado.columns:
         st.error("O arquivo de realizado não possui a coluna 'Código'. Corrija o arquivo e tente novamente.")
+        df_realizado = None
 else:
     st.error("Arquivo de realizado não encontrado ou inválido na URL.")
-    if df_realizado is not None:
-        if 'Código' not in df_realizado.columns:
-            st.error("O arquivo de realizado não possui a coluna 'Código'. Corrija o arquivo e tente novamente.")
-        else:
-            df_realizado['Código_4d'] = df_realizado['Código'].astype(str).str[-4:]
 
+# Debug: mostrar shapes dos dataframes
+st.write('Shape df_orcado:', df_orcado.shape if df_orcado is not None else None)
+st.write('Shape df_realizado:', df_realizado.shape if df_realizado is not None else None)
 
-    if df_orcado is not None and df_realizado is not None:
-        # Padronização automática dos parâmetros de análise
-        col_familia = 'Familia'  # já criada
-        col_codigo_orcado = 'Código_4d'
-        col_valor_orcado = 'Total'
-        col_qtd_orcado = 'Quantidade'
-        col_unit_orcado = 'Unit'
-        col_codigo_realizado = 'Código_4d'
-
-        # Detectar automaticamente a coluna de quantidade e total no realizado
-        # Se não encontrar pelo nome, tenta pelo índice ou tipo
+# Só executa o app se ambos os dataframes existem e têm dados
+if df_orcado is not None and not df_orcado.empty and df_realizado is not None and not df_realizado.empty:
+    # Padronização automática dos parâmetros de análise
+    col_familia = 'Familia'  # já criada
+    col_codigo_orcado = 'Código_4d'
+    col_valor_orcado = 'Total'
+    col_qtd_orcado = 'Quantidade'
+    col_unit_orcado = 'Unit'
+    col_codigo_realizado = 'Código_4d'
+    # ...existing code...
         col_valor_realizado = None
         col_qtd_realizado = None
         # Procurar coluna de quantidade (segunda coluna numérica)
