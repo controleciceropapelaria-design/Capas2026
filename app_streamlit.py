@@ -351,6 +351,21 @@ if orcado_files and realizado_files:
         if col in df_grafico.columns:
             df_grafico[col] = pd.to_numeric(df_grafico[col], errors='coerce').fillna(0)
 
+    # Descobrir coluna de categoria se existir
+    categoria_col = None
+    for cat_col in ['CATEGORIA', 'TIPO']:
+        if cat_col in df_orcado_group.columns:
+            categoria_col = cat_col
+            break
+    hover_cols = [col_codigo_orcado]
+    if categoria_col and categoria_col in df_grafico.columns:
+        hover_cols.append(categoria_col)
+    elif categoria_col and categoria_col in df_orcado_group.columns:
+        # Adiciona categoria ao df_grafico se não existir
+        cat_map = df_orcado_group.set_index(col_codigo_orcado)[categoria_col].to_dict()
+        df_grafico[categoria_col] = df_grafico[col_codigo_orcado].map(cat_map)
+        hover_cols.append(categoria_col)
+
     fig = px.bar(
         df_grafico,
         x=col_codigo_orcado,
@@ -361,7 +376,8 @@ if orcado_files and realizado_files:
         color_discrete_map={
             'Custo Unitário Orçado': '#1f77b4',
             'Custo Unitário Realizado': '#ff7f0e'
-        }
+        },
+        hover_data=hover_cols
     )
     fig.update_layout(
         legend_title_text='Legenda',
@@ -733,5 +749,3 @@ if orcado_files and realizado_files:
         xaxis=dict(type='category', categoryorder='array', categoryarray=codigos_ordenados)
     )
     st.plotly_chart(fig_line, use_container_width=True, key="fig_line")
-
-
