@@ -519,19 +519,18 @@ if orcado_files and realizado_files:
                 # Realizado: lógica especial para Clichê
                 if etapa_key == 'Clichê':
                     valor_realizado = valor_orcado
-                    # Família Jardim: duplicar valor dos códigos específicos apenas no realizado
+                    # Família Jardim: duplicar valor dos códigos específicos
                     if 'jardim' in familia_selecionada.lower():
                         codigos_duplicar = {'7899866829077','7899866829091','7899866829107','7899866829114','7899866829121','7899866829176'}
                         df_cliche = df_orcado_group[(df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_duplicar)) & (df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_familia))]
                         valor_duplicar = pd.to_numeric(df_cliche['Clichê'], errors='coerce').sum()
-                        valor_realizado += valor_duplicar  # duplicar só esses no realizado
-                    # Família Melissa: duplicar valor do código específico apenas no realizado
+                        valor_realizado += valor_duplicar  # duplicar só esses
+                    # Família Melissa: duplicar valor do código específico
                     if 'melissa' in familia_selecionada.lower():
                         codigo_duplicar = '7899866829404'
                         df_cliche = df_orcado_group[(df_orcado_group[col_codigo_orcado].astype(str) == codigo_duplicar) & (df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_familia))]
                         valor_duplicar = pd.to_numeric(df_cliche['Clichê'], errors='coerce').sum()
                         valor_realizado += valor_duplicar
-                    # O valor orçado deve ser apenas a soma simples, não duplicada
                 elif col_realizado and col_realizado in df_realizado_group.columns and 'Quantidade' in df_realizado_group.columns:
                     mask_codigos = df_realizado_group[col_codigo_realizado].astype(str).isin(codigos_familia)
                     valor_realizado = (pd.to_numeric(df_realizado_group.loc[mask_codigos, col_realizado], errors='coerce').fillna(0) * pd.to_numeric(df_realizado_group.loc[mask_codigos, 'Quantidade'], errors='coerce').fillna(0)).sum()
