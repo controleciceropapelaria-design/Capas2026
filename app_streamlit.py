@@ -1,3 +1,4 @@
+
 # ...existing code...
 
 import streamlit as st
@@ -244,100 +245,37 @@ if orcado_files and realizado_files:
             'Verniz': 'Verniz',
         }
         for etapa in etapas:
-            # ORÇADO: soma da coluna da etapa, se existir
+            # ORÇADO: soma da coluna da etapa, se existir, apenas para códigos da família
             col_orcado = colunas_orcado.get(etapa)
             if col_orcado in df_orcado_group.columns:
-                gasto_orcado = pd.to_numeric(df_orcado_group[col_orcado], errors='coerce').sum()
+                codigos_familia = set(df_exibir[col_codigo_orcado].astype(str))
+                gasto_orcado = pd.to_numeric(df_orcado_group[df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_familia)][col_orcado], errors='coerce').sum()
             elif etapa == 'Verniz':
-                # Caso especial: só existe em capasmelissa, coluna 10
                 familias_melissa = df_orcado_group[df_orcado_group['Familia'].str.contains('melissa', case=False, na=False)]
                 if not familias_melissa.empty and len(df_orcado_group.columns) > 9:
-                    gasto_orcado = pd.to_numeric(familias_melissa.iloc[:,9], errors='coerce').sum()
+                    codigos_familia = set(df_exibir[col_codigo_orcado].astype(str))
+                    gasto_orcado = pd.to_numeric(familias_melissa[familias_melissa[col_codigo_orcado].astype(str).isin(codigos_familia)].iloc[:,9], errors='coerce').sum()
                 else:
-                    gasto_orcado = 0
-            else:
-                gasto_orcado = 0
-            # REALIZADO: soma da coluna da etapa, se existir
-            col_realizado = colunas_realizado.get(etapa)
-            if col_realizado in df_realizado_group.columns:
-                gasto_realizado = pd.to_numeric(df_realizado_group[col_realizado], errors='coerce').sum()
-            else:
-                gasto_realizado = 0
-            economia = gasto_orcado - gasto_realizado
-            resumo_etapas.append({
-                'Etapa': etapa,
-                'Orçado': gasto_orcado,
-                'Realizado': gasto_realizado,
-                'Economia': economia
-            })
-        # Cards de economia/gasto por etapa
-        cols = st.columns(len(etapas))
-        # Mapear colunas de cada etapa para orçado e realizado
-        colunas_orcado = {
-            'Impressão': 'Impressão',
-            'Papel': 'Papel',
-            'Laminação': 'Laminação',
-            'Hot': 'Hot',
-            'Verniz': 'Verniz', # pode não existir em todos
-        }
-        colunas_realizado = {
-            'Papel': 'Papel',
-            'Impressão': 'Impressão',
-            'Laminação': 'Laminação',
-            'Hot': 'Hot',
-            'Verniz': 'Verniz',
-        }
-        # Ajustar para os índices informados pelo usuário
-        # Realizado: Papel(2), Impressão(3), Laminação(4), Hot(5), Verniz(6)
-        # Orcado: Impressão(5), Papel(6), Laminação(7), Hot(8), Verniz(10 em capasmelissa)
-        # Tentar encontrar as colunas pelo nome, se não, pelo índice
-        for etapa in etapas:
-            # ORÇADO
-            col_orcado = colunas_orcado.get(etapa)
-            if col_orcado not in df_orcado_group.columns:
-                # Tentar pelo índice
-                idx = None
-                if etapa == 'Impressão': idx = 4
-                elif etapa == 'Papel': idx = 5
-                elif etapa == 'Laminação': idx = 6
-                elif etapa == 'Hot': idx = 7
-                elif etapa == 'Verniz' and 'capasmelissa' in df_orcado_group['Familia'].unique(): idx = 9
-                if idx is not None and idx < len(df_orcado_group.columns):
-                    col_orcado = df_orcado_group.columns[idx]
-            # REALIZADO
-            col_realizado = colunas_realizado.get(etapa)
-            if col_realizado not in df_realizado_group.columns:
-                idx = None
-                if etapa == 'Papel': idx = 2
-                elif etapa == 'Impressão': idx = 3
-                elif etapa == 'Laminação': idx = 4
-                elif etapa == 'Hot': idx = 5
-                elif etapa == 'Verniz': idx = 6
-                if idx is not None and idx < len(df_realizado_group.columns):
-                    col_realizado = df_realizado_group.columns[idx]
-            # Calcular valores (só soma se a coluna existir e for numérica)
-            if col_orcado in df_orcado_group.columns:
-                try:
-                    gasto_orcado = pd.to_numeric(df_orcado_group[col_orcado], errors='coerce').sum()
-                except Exception:
-                    gasto_orcado = 0
-            else:
-                gasto_orcado = 0
-            if col_realizado in df_realizado_group.columns:
-                try:
-                    gasto_realizado = pd.to_numeric(df_realizado_group[col_realizado], errors='coerce').sum()
-                except Exception:
-                    gasto_realizado = 0
-            else:
-                gasto_realizado = 0
-            economia = gasto_orcado - gasto_realizado
-
-            resumo_etapas.append({
-                'Etapa': etapa,
-                'Orçado': gasto_orcado,
-                'Realizado': gasto_realizado,
-                'Economia': economia
-            })
+                    total_orcado = 0
+                    total_realizado = 0
+                    for etapa_key, etapa_label in etapas.items():
+                        if etapa_key in df_orcado_group.columns:
+                            mask_codigos = df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_familia)
+                            valor_orcado = pd.to_numeric(df_orcado_group.loc[mask_codigos, etapa_key], errors='coerce').fillna(0).sum()
+                            valor_realizado = pd.to_numeric(df_realizado_group.loc[mask_codigos, etapa_key], errors='coerce').fillna(0).sum()
+                            # Ajuste especial para Clichê
+                            if etapa_key == 'Clichê':
+                                if 'jardim' in familia_selecionada.lower():
+                                    valor_realizado = valor_orcado + 1277.70
+                                elif 'melissa' in familia_selecionada.lower():
+                                    valor_realizado = valor_orcado + 1126
+                                # Considera economia/prejuízo do clichê
+                                total_orcado += valor_orcado
+                                total_realizado += valor_realizado
+                            else:
+                                total_orcado += valor_orcado
+                                total_realizado += valor_realizado
+                    # return total_orcado, total_realizado  # Removido pois não pode retornar fora de função
 
     # Gráfico comparativo principal
     st.markdown(f"### Comparativo de Custos Unitários — {titulo_familia}")
@@ -378,14 +316,22 @@ if orcado_files and realizado_files:
     # Comparativo de custo total orçado vs realizado
 
     total_orcado = df_exibir['Total Orçado'].sum() if 'Total Orçado' in df_exibir.columns else 0
-    # Calcular total gasto: soma do valor unitário do realizado (Unit) * quantidade realizada (Quantidade) para cada código
     total_realizado = 0
     if 'Código_4d' in df_exibir.columns:
         codigos_familia = set(df_exibir[col_codigo_orcado].astype(str))
-        # Buscar no df_realizado_group os códigos da família
-        df_realizado_fam = df_realizado_group[df_realizado_group[col_codigo_realizado].astype(str).isin(codigos_familia)]
-        if 'Unit' in df_realizado_fam.columns and 'Quantidade' in df_realizado_fam.columns:
-            total_realizado = (pd.to_numeric(df_realizado_fam['Unit'], errors='coerce').fillna(0) * pd.to_numeric(df_realizado_fam['Quantidade'], errors='coerce').fillna(0)).sum()
+        df_realizado_fam = df_realizado_group[df_realizado_group['Código_4d'].astype(str).isin(codigos_familia)]
+        if 'Total' in df_realizado_fam.columns:
+            total_realizado = pd.to_numeric(df_realizado_fam['Total'], errors='coerce').fillna(0).sum()
+        # Somar o valor do card de Clichê ao total realizado
+        valor_cliche_card = 0
+        if 'Clichê' in df_orcado_group.columns:
+            mask_codigos = df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_familia)
+            valor_cliche_card = pd.to_numeric(df_orcado_group.loc[mask_codigos, 'Clichê'], errors='coerce').fillna(0).sum()
+            if 'jardim' in familia_selecionada.lower():
+                valor_cliche_card += 1277.70
+            if 'melissa' in familia_selecionada.lower():
+                valor_cliche_card += 1126
+        total_realizado += valor_cliche_card
     diferenca = total_orcado - total_realizado
     cor = 'green' if diferenca > 0 else 'red' if diferenca < 0 else 'gray'
 
@@ -500,21 +446,15 @@ if orcado_files and realizado_files:
                     valor_orcado = pd.to_numeric(df_orcado_group[df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_familia)][col_orcado], errors='coerce').sum()
                 else:
                     valor_orcado = 0
-                # Realizado: lógica especial para Clichê
-                if etapa_key == 'Clichê':
-                    valor_realizado = valor_orcado
-                    # Família Jardim: duplicar valor dos códigos específicos
+                # Realizado: soma da coluna 'Total' do realizado para os códigos da família
+                if etapa_key == 'Clichê' and 'Clichê' in df_orcado_group.columns:
+                    # No card, o realizado do clichê será igual ao orçado, exceto para Jardim e Melissa: soma adicional
+                    mask_codigos = df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_familia)
+                    valor_realizado = pd.to_numeric(df_orcado_group.loc[mask_codigos, 'Clichê'], errors='coerce').fillna(0).sum()
                     if 'jardim' in familia_selecionada.lower():
-                        codigos_duplicar = {'7899866829077','7899866829091','7899866829107','7899866829114','7899866829121','7899866829176'}
-                        df_cliche = df_orcado_group[(df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_duplicar)) & (df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_familia))]
-                        valor_duplicar = pd.to_numeric(df_cliche['Clichê'], errors='coerce').sum()
-                        valor_realizado += valor_duplicar  # duplicar só esses
-                    # Família Melissa: duplicar valor do código específico
+                        valor_realizado += 1277.70
                     if 'melissa' in familia_selecionada.lower():
-                        codigo_duplicar = '7899866829404'
-                        df_cliche = df_orcado_group[(df_orcado_group[col_codigo_orcado].astype(str) == codigo_duplicar) & (df_orcado_group[col_codigo_orcado].astype(str).isin(codigos_familia))]
-                        valor_duplicar = pd.to_numeric(df_cliche['Clichê'], errors='coerce').sum()
-                        valor_realizado += valor_duplicar
+                        valor_realizado += 1126
                 elif col_realizado and col_realizado in df_realizado_group.columns and 'Quantidade' in df_realizado_group.columns:
                     mask_codigos = df_realizado_group[col_codigo_realizado].astype(str).isin(codigos_familia)
                     valor_realizado = (pd.to_numeric(df_realizado_group.loc[mask_codigos, col_realizado], errors='coerce').fillna(0) * pd.to_numeric(df_realizado_group.loc[mask_codigos, 'Quantidade'], errors='coerce').fillna(0)).sum()
@@ -558,6 +498,9 @@ if orcado_files and realizado_files:
                                 codigo_duplicar = '7899866829404'
                                 mask_dup = df_realizado_cod[col_codigo_orcado].astype(str) == codigo_duplicar
                                 df_realizado_cod.loc[mask_dup, 'Realizado'] = df_realizado_cod.loc[mask_dup, 'Orçado'] * 2
+                            # Corrigir o valor_realizado do card para Jardim (soma dos realizados já duplicados)
+                            if 'jardim' in familia_selecionada.lower():
+                                valor_realizado = df_realizado_cod['Realizado'].sum()
                         elif col_realizado and col_realizado in df_realizado_group.columns and 'Quantidade' in df_realizado_group.columns:
                             mask_codigos = df_realizado_group[col_codigo_realizado].astype(str).isin(codigos_familia)
                             df_realizado_cod = df_realizado_group.loc[mask_codigos, [col_codigo_realizado, col_realizado, 'Quantidade']].copy()
